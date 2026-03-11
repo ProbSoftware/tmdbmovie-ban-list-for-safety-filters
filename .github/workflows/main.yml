@@ -22,7 +22,7 @@ jobs:
       - name: 🚀 Madenciyi Çalıştır
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-        run: dotnet run --project ProbSoftwareMiner.csproj 
+        run: dotnet run --project ProbSoftware.csproj 
 
       - name: 💾 Değişiklikleri GitHub'a Kaydet
         run: |
