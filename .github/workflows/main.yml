@@ -2,14 +2,16 @@ name: TMDB Movies Restriction Bot
 
 on:
   schedule:
-    # Her gün Türkiye saati ile sabaha karşı çalışır
     - cron: '0 2 * * *' 
-  workflow_dispatch: # Bu satır sana "Hemen Çalıştır" butonu verir
+  workflow_dispatch: 
 
 jobs:
   build-and-mine:
     runs-on: ubuntu-latest
-    
+  
+    permissions:
+      contents: write 
+
     steps:
       - name: 📥 Kodu Sunucuya Çek
         uses: actions/checkout@v4
@@ -22,7 +24,7 @@ jobs:
       - name: 🚀 Madenciyi Çalıştır
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-        run: dotnet run --project ProbSoftware.csproj 
+        run: dotnet run --project Program.csproj 
 
       - name: 💾 Değişiklikleri GitHub'a Kaydet
         run: |
