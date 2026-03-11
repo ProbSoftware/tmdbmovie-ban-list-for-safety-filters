@@ -1,0 +1,33 @@
+name: TMDB Movies Restriction Bot
+
+on:
+  schedule:
+    # Her gün Türkiye saati ile sabaha karşı çalışır
+    - cron: '0 2 * * *' 
+  workflow_dispatch: # Bu satır sana "Hemen Çalıştır" butonu verir
+
+jobs:
+  build-and-mine:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Kodu Sunucuya Çek
+        uses: actions/checkout@v4
+
+      - name: ⚙️ .NET Kurulumu
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 🚀 Madenciyi Çalıştır
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: dotnet run --project ProbSoftwareMiner.csproj 
+
+      - name: 💾 Değişiklikleri GitHub'a Kaydet
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add filter_data.json islenen_keywords.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "🤖 Otomatik Güncelleme: TMDB veritabanı yenilendi"
+          git push
