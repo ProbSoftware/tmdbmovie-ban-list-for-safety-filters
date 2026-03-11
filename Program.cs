@@ -20,7 +20,7 @@ namespace ProbSoftware
 
         static async Task Main(string[] args)
         {
-            Console.WriteLine("=== PROB SOFTWARE VERI MADENCILIGI V7.0 (AKILLI GÜNLÜK & GEÇMİŞ TARAMA) ===");
+            Console.WriteLine("=== PROB SOFTWARE VERI MADENCILIGI V7.1 (DESYNC KORUMALI) ===");
 
             if (string.IsNullOrEmpty(apiKey))
             {
@@ -61,7 +61,6 @@ namespace ProbSoftware
             var banliKeywords = GetBanliList().Distinct().ToList();
             var hassasKeywords = GetHassasList().Distinct().ToList();
 
-            // Günlük taramalar için son 3 günü (veya 1 haftayı) baz alıyoruz. Garanti olsun diye 7 gün geriden başlatalım.
             string sonTarihFiltresi = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-dd");
 
             // --- 1. FAZ: YETİŞKİN TARAMASI ---
@@ -69,18 +68,20 @@ namespace ProbSoftware
             foreach (var kwId in banliKeywords)
             {
                 bool isNewKeyword = !state.IslenenYetiskinKeywords.Contains(kwId);
-                string dateFilter = isNewKeyword ? null : sonTarihFiltresi; // Yeniyse tüm tarih, eskiyse sadece son 7 gün
+                string dateFilter = isNewKeyword ? null : sonTarihFiltresi; 
 
                 if (isNewKeyword) Console.WriteLine($"\n[YENİ KEYWORD] KW:{kwId} bulundu! Tüm geçmiş taranıyor...");
                 else Console.WriteLine($"\n[GÜNLÜK KONTROL] KW:{kwId} için sadece {sonTarihFiltresi} sonrasi taranıyor...");
 
-                await FetchData(kwId, "movie", banliFilmler, null, "🔞 YET-FILM", dateFilter);
-                await FetchData(kwId, "tv", banliDiziler, null, "🔞 YET-DIZI", dateFilter);
+                int eklendiFilm = await FetchData(kwId, "movie", banliFilmler, null, "🔞 YET-FILM", dateFilter);
+                int eklendiDizi = await FetchData(kwId, "tv", banliDiziler, null, "🔞 YET-DIZI", dateFilter);
 
-                if (isNewKeyword)
+                // GÜVENLİK (DESYNC) ÇÖZÜMÜ: Eğer yeni bir şey eklendiyse, JSON'u hemen güncelle.
+                if (isNewKeyword || eklendiFilm > 0 || eklendiDizi > 0)
                 {
-                    state.IslenenYetiskinKeywords.Add(kwId);
+                    if (isNewKeyword) state.IslenenYetiskinKeywords.Add(kwId);
                     await File.WriteAllTextAsync(statePath, JsonConvert.SerializeObject(state));
+                    await FinalizeAndExportJson(dataPath); // Filmleri anında kurtarıyoruz!
                 }
             }
 
@@ -94,38 +95,33 @@ namespace ProbSoftware
                 if (isNewKeyword) Console.WriteLine($"\n[YENİ KEYWORD] KW:{kwId} bulundu! Tüm geçmiş taranıyor...");
                 else Console.WriteLine($"\n[GÜNLÜK KONTROL] KW:{kwId} için sadece {sonTarihFiltresi} sonrasi taranıyor...");
 
-                await FetchData(kwId, "movie", hassasFilmler, banliFilmler, "⚠️ HAS-FILM", dateFilter);
-                await FetchData(kwId, "tv", hassasDiziler, banliDiziler, "⚠️ HAS-DIZI", dateFilter);
+                int eklendiFilm = await FetchData(kwId, "movie", hassasFilmler, banliFilmler, "⚠️ HAS-FILM", dateFilter);
+                int eklendiDizi = await FetchData(kwId, "tv", hassasDiziler, banliDiziler, "⚠️ HAS-DIZI", dateFilter);
 
-                if (isNewKeyword)
+                if (isNewKeyword || eklendiFilm > 0 || eklendiDizi > 0)
                 {
-                    state.IslenenHassasKeywords.Add(kwId);
+                    if (isNewKeyword) state.IslenenHassasKeywords.Add(kwId);
                     await File.WriteAllTextAsync(statePath, JsonConvert.SerializeObject(state));
+                    await FinalizeAndExportJson(dataPath);
                 }
             }
-
-            // --- 3. FAZ: JSON ÇIKTISI VE RAPORLAMA ---
-            await FinalizeAndExportJson(dataPath);
 
             Console.WriteLine("\n" + new string('=', 50));
             Console.WriteLine("🏁 ISLEM TAMAMLANDI! Tüm yeni veriler dosyaya işlendi.");
         }
 
-        // dateFilter parametresi eklendi
         static async Task<int> FetchData(int keywordId, string type, HashSet<int> targetSet, HashSet<int> upperSet, string logTag, string dateFilter)
         {
             int page = 1;
             int totalPages = 1;
             int addedInThisKeyword = 0;
 
-            // Filme ve diziye göre tarih parametresinin adı TMDB'de farklıdır
             string dateParamName = type == "movie" ? "primary_release_date.gte" : "first_air_date.gte";
 
             try
             {
                 do
                 {
-                    // Tarih filtresi varsa URL'ye ekle
                     string url = $"https://api.themoviedb.org/3/discover/{type}?api_key={apiKey}&with_keywords={keywordId}&page={page}&include_adult=false";
                     if (!string.IsNullOrEmpty(dateFilter))
                     {
@@ -190,13 +186,6 @@ namespace ProbSoftware
 
             string jsonOutput = JsonConvert.SerializeObject(exportData, Formatting.None); 
             await File.WriteAllTextAsync(currentPath, jsonOutput);
-
-            Console.WriteLine("\n\n" + new string('*', 30));
-            Console.WriteLine("📊 MADENCİLİK ÖZET RAPORU");
-            Console.WriteLine("------------------------------");
-            Console.WriteLine($"🔞 YASAKLI : {banliFilmler.Count} Film, {banliDiziler.Count} Dizi");
-            Console.WriteLine($"⚠️ HASSAS  : {hassasFilmler.Count} Film, {hassasDiziler.Count} Dizi");
-            Console.WriteLine("------------------------------");
         }
 
         public class TmdbResponse { public int total_pages { get; set; } public List<TmdbResult> results { get; set; } }
