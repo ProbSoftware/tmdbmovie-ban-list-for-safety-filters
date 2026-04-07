@@ -32,6 +32,8 @@ namespace ProbSoftware
             string dataPath = Path.Combine(Directory.GetCurrentDirectory(), "filter_data.json");
             MinerState state = new MinerState();
 
+            string txtPath = Path.Combine(Directory.GetCurrentDirectory(), "keyword_isimleri.txt");
+
             // --- 0. FAZ: HAFIZAYI YÜKLEME ---
             if (File.Exists(dataPath))
             {
