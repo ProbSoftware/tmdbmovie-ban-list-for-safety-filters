@@ -32,7 +32,6 @@ namespace ProbSoftware
             string dataPath = Path.Combine(Directory.GetCurrentDirectory(), "filter_data.json");
             MinerState state = new MinerState();
 
-            string txtPath = Path.Combine(Directory.GetCurrentDirectory(), "keyword_isimleri.txt");
 
             // --- 0. FAZ: HAFIZAYI YÜKLEME ---
             if (File.Exists(dataPath))
@@ -64,7 +63,7 @@ namespace ProbSoftware
             var hassasKeywords = GetHassasList().Distinct().ToList();
 
             string sonTarihFiltresi = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-dd");
-
+await GuncelleKeywordIsimleriTxtAsync(banliKeywords, hassasKeywords);
             // --- 1. FAZ: YETİŞKİN TARAMASI ---
             Console.WriteLine("\n--- [FAZ 1] YETISKIN ICERIK TARANIYOR ---");
             foreach (var kwId in banliKeywords)
