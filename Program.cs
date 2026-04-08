@@ -32,7 +32,6 @@ namespace ProbSoftware
             string dataPath = Path.Combine(Directory.GetCurrentDirectory(), "filter_data.json");
             MinerState state = new MinerState();
 
-
             // --- 0. FAZ: HAFIZAYI YÜKLEME ---
             if (File.Exists(dataPath))
             {
@@ -63,7 +62,10 @@ namespace ProbSoftware
             var hassasKeywords = GetHassasList().Distinct().ToList();
 
             string sonTarihFiltresi = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-dd");
-await GuncelleKeywordIsimleriTxtAsync(banliKeywords, hassasKeywords);
+
+            // --- SÖZLÜK OLUŞTURMA FAZI ---
+            await GuncelleKeywordIsimleriTxtAsync(banliKeywords, hassasKeywords);
+
             // --- 1. FAZ: YETİŞKİN TARAMASI ---
             Console.WriteLine("\n--- [FAZ 1] YETISKIN ICERIK TARANIYOR ---");
             foreach (var kwId in banliKeywords)
@@ -77,12 +79,12 @@ await GuncelleKeywordIsimleriTxtAsync(banliKeywords, hassasKeywords);
                 int eklendiFilm = await FetchData(kwId, "movie", banliFilmler, null, "🔞 YET-FILM", dateFilter);
                 int eklendiDizi = await FetchData(kwId, "tv", banliDiziler, null, "🔞 YET-DIZI", dateFilter);
 
-                // GÜVENLİK (DESYNC) ÇÖZÜMÜ: Eğer yeni bir şey eklendiyse, JSON'u hemen güncelle.
+                // GÜVENLİK (DESYNC) ÇÖZÜMÜ
                 if (isNewKeyword || eklendiFilm > 0 || eklendiDizi > 0)
                 {
                     if (isNewKeyword) state.IslenenYetiskinKeywords.Add(kwId);
                     await File.WriteAllTextAsync(statePath, JsonConvert.SerializeObject(state));
-                    await FinalizeAndExportJson(dataPath); // Filmleri anında kurtarıyoruz!
+                    await FinalizeAndExportJson(dataPath); 
                 }
             }
 
@@ -189,8 +191,97 @@ await GuncelleKeywordIsimleriTxtAsync(banliKeywords, hassasKeywords);
             await File.WriteAllTextAsync(currentPath, jsonOutput);
         }
 
+        static async Task GuncelleKeywordIsimleriTxtAsync(List<int> banli, List<int> hassas)
+        {
+            Console.WriteLine("\n--- [FAZ 0.5] KEYWORD SÖZLÜĞÜ GÜNCELLENİYOR ---");
+            string txtPath = Path.Combine(Directory.GetCurrentDirectory(), "keyword_isimleri.txt");
+            Dictionary<int, string> keywordSozlugu = new Dictionary<int, string>();
+
+            if (File.Exists(txtPath))
+            {
+                var lines = File.ReadAllLines(txtPath);
+                foreach (var line in lines)
+                {
+                    if (line.StartsWith("ID: "))
+                    {
+                        var parts = line.Split('|');
+                        if (parts.Length == 2)
+                        {
+                            var idStr = parts[0].Replace("ID:", "").Trim();
+                            var nameStr = parts[1].Replace("İsim:", "").Trim();
+                            if (int.TryParse(idStr, out int id))
+                            {
+                                keywordSozlugu[id] = nameStr;
+                            }
+                        }
+                    }
+                }
+            }
+
+            bool degisiklikOldu = false;
+            var tumKeywords = banli.Concat(hassas).Distinct().ToList();
+
+            foreach (var kwId in tumKeywords)
+            {
+                if (!keywordSozlugu.ContainsKey(kwId) || keywordSozlugu[kwId] == "Bilinmiyor")
+                {
+                    string kwName = await FetchKeywordName(kwId);
+                    keywordSozlugu[kwId] = kwName;
+                    degisiklikOldu = true;
+                    Console.WriteLine($"[SÖZLÜĞE EKLENDİ] ID: {kwId} -> {kwName}");
+                    await Task.Delay(40); 
+                }
+            }
+
+            if (degisiklikOldu || !File.Exists(txtPath))
+            {
+                using (StreamWriter sw = new StreamWriter(txtPath, false, System.Text.Encoding.UTF8)) 
+                {
+                    sw.WriteLine("=========================================");
+                    sw.WriteLine("        YASAKLI (BANLI) KEYWORDS");
+                    sw.WriteLine("=========================================\n");
+                    foreach (var id in banli)
+                    {
+                        string name = keywordSozlugu.ContainsKey(id) ? keywordSozlugu[id] : "Bilinmiyor";
+                        sw.WriteLine($"ID: {id} | İsim: {name}");
+                    }
+
+                    sw.WriteLine("\n\n=========================================");
+                    sw.WriteLine("           HASSAS KEYWORDS");
+                    sw.WriteLine("=========================================\n");
+                    foreach (var id in hassas)
+                    {
+                        string name = keywordSozlugu.ContainsKey(id) ? keywordSozlugu[id] : "Bilinmiyor";
+                        sw.WriteLine($"ID: {id} | İsim: {name}");
+                    }
+                }
+                Console.WriteLine($"[BAŞARILI] 'keyword_isimleri.txt' dosyası güncellendi ve kaydedildi!");
+            }
+            else
+            {
+                Console.WriteLine("[BİLGİ] Yeni keyword yok, sözlük TXT dosyası zaten güncel.");
+            }
+        }
+
+        static async Task<string> FetchKeywordName(int keywordId)
+        {
+            try
+            {
+                var response = await client.GetAsync($"https://api.themoviedb.org/3/keyword/{keywordId}?api_key={apiKey}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var data = JsonConvert.DeserializeObject<TmdbKeyword>(content);
+                    return data?.name ?? "Bilinmiyor";
+                }
+            }
+            catch { }
+            return "Bilinmiyor";
+        }
+
         public class TmdbResponse { public int total_pages { get; set; } public List<TmdbResult> results { get; set; } }
         public class TmdbResult { public int id { get; set; } }
+        public class TmdbKeyword { public int id { get; set; } public string name { get; set; } }
 
         public class MinerState
         {
