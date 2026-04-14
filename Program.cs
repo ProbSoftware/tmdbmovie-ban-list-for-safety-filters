@@ -194,7 +194,7 @@ namespace ProbSoftware
         static async Task GuncelleKeywordIsimleriTxtAsync(List<int> banli, List<int> hassas)
         {
             Console.WriteLine("\n--- [FAZ 0.5] KEYWORD SÖZLÜĞÜ GÜNCELLENİYOR ---");
-            string txtPath = Path.Combine(Directory.GetCurrentDirectory(), "keyword_isimleri.txt");
+            string txtPath = Path.Combine(Directory.GetCurrentDirectory(), "keyword_list.txt");
             Dictionary<int, string> keywordSozlugu = new Dictionary<int, string>();
 
             if (File.Exists(txtPath))
@@ -255,7 +255,7 @@ namespace ProbSoftware
                         sw.WriteLine($"ID: {id} | İsim: {name}");
                     }
                 }
-                Console.WriteLine($"[BAŞARILI] 'keyword_isimleri.txt' dosyası güncellendi ve kaydedildi!");
+                Console.WriteLine($"[BAŞARILI] 'keyword_list.txt' dosyası güncellendi ve kaydedildi!");
             }
             else
             {
