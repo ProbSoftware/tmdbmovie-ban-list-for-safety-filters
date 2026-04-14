@@ -238,7 +238,7 @@ namespace ProbSoftware
                 using (StreamWriter sw = new StreamWriter(txtPath, false, System.Text.Encoding.UTF8)) 
                 {
                     sw.WriteLine("=========================================");
-                    sw.WriteLine("        YASAKLI (BANLI) KEYWORDS");
+                    sw.WriteLine("        BANNED KEYWORDS");
                     sw.WriteLine("=========================================\n");
                     foreach (var id in banli)
                     {
@@ -247,7 +247,7 @@ namespace ProbSoftware
                     }
 
                     sw.WriteLine("\n\n=========================================");
-                    sw.WriteLine("           HASSAS KEYWORDS");
+                    sw.WriteLine("           SENSITIVE KEYWORDS");
                     sw.WriteLine("=========================================\n");
                     foreach (var id in hassas)
                     {
